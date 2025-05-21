@@ -4,11 +4,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-load_dotenv()  # загружает переменные из .env
+load_dotenv()
 
-arb_rpc = os.getenv('ARB_RPC')
-bsc_rpc = os.getenv('BSC_RPC')
+arb_rpc = 'https://arb-pokt.nodies.app'
+bsc_rpc = 'https://bsc-rpc.publicnode.com'
 private_key = os.getenv('PRIVATE_KEY')
+usdc_arb = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
 
 if getattr(sys, "frozen", False):
     ROOT_DIR = Path(sys.executable).parent.absolute()
