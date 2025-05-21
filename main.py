@@ -1,7 +1,9 @@
 from web3 import Web3
 from data.config import arb_rpc, bsc_rpc, private_key
 from eth_account.signers.local import LocalAccount
-# from web3.middleware import geth_poa_middleware
+#from utils import get_private_from_seed
+
+
 
 web3 = Web3(Web3.HTTPProvider(endpoint_uri=arb_rpc))
 print(f"is connected: {web3.is_connected()}")
@@ -25,15 +27,8 @@ print(f"balance of {wallet_address} is {web3.from_wei(balance, 'gwei')} GWEI")
 print(f"balance of {wallet_address} is {web3.to_wei(ether_balance, 'ether')} WEI")
 
 
-# получение приватного ключа из сид фразы
-# def get_private_from_seed(seed: str) -> str:
-#     web3 = Web3(Web3.HTTPProvider(endpoint_uri=arb_rpc))
-#     web3.middleware_onion.inject(geth_poa_middleware, layer=0)
-#     web3.eth.account.enable_unaudited_hdwallet_features()
-#     web3_account: LocalAccount = web3.eth.account.from_mnemonic(seed)
-#     private_key = web3_account._private_key.hex()
-#     return private_key
 
+# получение приватного ключа из сид фразы
 # private_key = get_private_from_seed(seed=seed)
 # print(private_key)
 
