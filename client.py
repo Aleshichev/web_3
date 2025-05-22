@@ -17,20 +17,20 @@ class Client:
             self.w3.eth.account.from_key(private_key=private_key).address
         )
 
-    def _get_contract(self, contract_adress: str):
+    def _get_contract(self, contract_address: str):
         return self.w3.eth.contract(
-            address=Web3.to_checksum_address(contract_adress),
+            address=Web3.to_checksum_address(contract_address),
             abi=Client.default_abi,
         )
 
-    def get_decimals(self, contract_adress: str) -> int:
-        contract = self._get_contract(contract_adress)
+    def get_decimals(self, contract_address: str) -> int:
+        contract = self._get_contract(contract_address)
         return int(contract.functions.decimals().call())
 
-    def balance_of(self, contract_adress: str, address: Optional[str] = None):
+    def balance_of(self, contract_address: str, address: Optional[str] = None):
         if not address:
             address = self.address
-        contract = self._get_contract(contract_adress)
+        contract = self._get_contract(contract_address)
         return int(
             contract.functions.balanceOf(address).call(),
         )
@@ -42,7 +42,7 @@ class Client:
     def check_balance_interface(self, token_address, min_value) -> bool:
         print(f"{self.address} | balanceOf | check balance of {token_address}")
         balance = self.balance_of(contract_address=token_address)
-        decimal = self.get_decimals(contract_adress=token_address)
+        decimal = self.get_decimals(contract_address=token_address)
         if balance < min_value * 10**decimal:
             print(f"{self.address} | balanceOf | not enough {token_address}")
             return False
@@ -59,7 +59,7 @@ class Client:
             "to": Web3.to_checksum_address(to),
             "gasPrice": self.w3.eth.gas_price,
         }
-        if not data:
+        if data:
             tx_params["data"] = data
         if value:
             tx_params["value"] = value
@@ -68,9 +68,13 @@ class Client:
         except Exception as err:
             print(f"{self.address} | Transaction failed | {err}")
             return None
+        
+        # print(tx_params['gas'])
+        # print('-------------------------------------------')
+        # print(tx_params["data"])
 
         sign = self.w3.eth.account.sign_transaction(tx_params, self.private_key)
-        return self.w3.eth.send_raw_transaction(sign.rawTransaction)
+        return self.w3.eth.send_raw_transaction(sign.raw_transaction)
 
     def verif_tx(self, tx_hash) -> bool:
         try:
@@ -91,5 +95,48 @@ class Client:
         contract = self._get_contract(token_address)
         return self.send_transaction(
             to=token_address,
-            data=contract.encodeABI("approve", args=(spender, amount.Wei)),
+            data=contract.encode_abi("approve", args=(spender, amount.Wei)),
         )
+
+    def approve_interface(self, token_address: str, spender: str, amount: Optional[TokenAmount] = None) -> bool:
+        print(f'{self.address} | approve | start approve {token_address} for spender {spender}')
+        decimals = self.get_decimals(contract_address=token_address)
+        balance = TokenAmount(
+            amount=self.balance_of(contract_address=token_address),
+            decimals=decimals,
+            wei=True
+        )
+        if balance.Wei <= 0:
+            print(f'{self.address} | approve | zero balance')
+            return False
+
+        if not amount or amount.Wei > balance.Wei:
+            amount = balance
+
+        approved = TokenAmount(
+            amount=self.get_allowance(token_address=token_address, spender=spender),
+            decimals=decimals,
+            wei=True
+        )
+        if amount.Wei <= approved.Wei:
+            print(f'{self.address} | approve | already approved')
+            return True
+
+        tx_hash = self.approve(token_address=token_address, spender=spender, amount=amount)
+        if not self.verif_tx(tx_hash=tx_hash):
+            print(f'{self.address} | approve | {token_address} for spender {spender}')
+            return False
+        return True
+
+    def get_eth_price(self, token='ETH'):
+        token = token.upper()
+        print(f'{self.address} | getting {token} price')
+        response = requests.get(f'https://api.binance.com/api/v3/depth?limit=1&symbol={token}USDT')
+        if response.status_code != 200:
+            print(f'code: {response.status_code} | json: {response.json()}')
+            return None
+        result_dict = response.json()
+        if 'asks' not in result_dict:
+            print(f'code: {response.status} | json: {response.json()}')
+            return None
+        return float(result_dict['asks'][0][0])
