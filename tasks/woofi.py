@@ -46,12 +46,9 @@ class WooFi:
 
     def swap_usdc_to_eth(self, amount: Optional[TokenAmount] = None, slippage: float = 1):
         if not amount:
-            amount = TokenAmount(
-                amount=self.client.balance_of(contract_address=WooFi.usdc_address),
-                decimals=6,
-                wei=True
-            )
+            amount = self.client.balance_of(contract_address=WooFi.usdc_address)
 
+    
         res = self.client.approve_interface(
             token_address=WooFi.usdc_address,
             spender=WooFi.router_address,
@@ -83,5 +80,5 @@ class WooFi:
                                         self.client.address,
                                         self.client.address,
                                     )),
-            increase_gas=1.1
+            # increase_gas=1.1
         )

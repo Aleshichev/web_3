@@ -35,8 +35,19 @@ class Client:
         if not address:
             address = self.address
         contract = self._get_contract(contract_address)
+        
+        # raw_amount = contract.functions.balanceOf(address).call()
+        # print(f"[DEBUG] balanceOf result: {raw_amount}, type: {type(raw_amount)}")
+        
+        call_options = {
+        "from": self.address,
+        "gas": 50000  # увеличенный лимит газа
+    }
+
+        raw_amount = contract.functions.balanceOf(address).call(call_options)
+        print(f"[DEBUG] balanceOf result: {raw_amount}, type: {type(raw_amount)}")
         return TokenAmount(
-            amount=contract.functions.balanceOf(address).call(),
+            amount=raw_amount,
             decimals=self.get_decimals(contract_address=contract_address),
             wei=True,
         )
@@ -100,12 +111,12 @@ class Client:
         latest_block_transaction_count = w3.eth.get_block_transaction_count(
             block_number
         )
-        print(latest_block_transaction_count)
+        # print(latest_block_transaction_count)
         max_priority_fee_per_gas_lst = []
         for i in range(latest_block_transaction_count):
             try:
                 transaction = w3.eth.get_transaction_by_block(block_number, i)
-                print(transaction)
+                # print(transaction)
                 if "maxPriorityFeePerGas" in transaction:
                     max_priority_fee_per_gas_lst.append(
                         transaction["maxPriorityFeePerGas"]
@@ -117,11 +128,11 @@ class Client:
             max_priority_fee_per_gas = w3.eth.max_priority_fee
         else:
             max_priority_fee_per_gas_lst.sort()
-            print(max_priority_fee_per_gas_lst)
+            # print(max_priority_fee_per_gas_lst)
             max_priority_fee_per_gas = max_priority_fee_per_gas_lst[
                 len(max_priority_fee_per_gas_lst) // 2
             ]
-            print(max_priority_fee_per_gas)
+            # print(max_priority_fee_per_gas)
         return max_priority_fee_per_gas
 
     def send_transaction(
@@ -134,6 +145,7 @@ class Client:
         max_priority_fee_per_gas: Optional[int] = None,
         max_fee_per_gas: Optional[int] = None,
     ):
+        print('running send_transaction')
         if not from_:
             from_ = self.address
 
@@ -152,12 +164,14 @@ class Client:
 
             last_block = w3.eth.get_block("latest")
             if not max_priority_fee_per_gas:
-                max_priority_fee_per_gas = self.w3.eth.max_priority_fee
-                # max_priority_fee_per_gas = Client.get_max_priority_fee_per_gas(w3=w3, block=last_block)
+                #max_priority_fee_per_gas = self.w3.eth.max_priority_fee
+                max_priority_fee_per_gas = Client.get_max_priority_fee_per_gas(w3=w3, block=last_block)
+                print(f"[DEBUG] max_priority_fee_per_gas: {max_priority_fee_per_gas}")
             if not max_fee_per_gas:
-                # base_fee = int(last_block['baseFeePerGas'] * 1.125)
-                base_fee = int(last_block["baseFeePerGas"] * increase_gas)
+                base_fee = int(last_block['baseFeePerGas'] * 1.15)
+                # base_fee = int(last_block["baseFeePerGas"] * increase_gas)
                 max_fee_per_gas = base_fee + max_priority_fee_per_gas
+                print(f"[DEBUG] max_fee_per_gas: {max_fee_per_gas}")
             tx_params["maxPriorityFeePerGas"] = max_priority_fee_per_gas
             tx_params["maxFeePerGas"] = max_fee_per_gas
 
@@ -168,13 +182,18 @@ class Client:
             tx_params["value"] = value
 
         try:
-            tx_params["gas"] = int(self.w3.eth.estimate_gas(tx_params) * increase_gas)
+            # tx_params["gas"] = int(self.w3.eth.estimate_gas(tx_params) * increase_gas)
+            estimated_gas = self.w3.eth.estimate_gas(tx_params)
+            print(f"[DEBUG] estimated gas: {estimated_gas}")
+            tx_params["gas"] = int(estimated_gas * increase_gas)
+            print(f"[DEBUG] Estimated gas: {estimated_gas}, Adjusted: {tx_params['gas']}")
+
         except Exception as err:
             print(f"{self.address} | Transaction failed | {err}")
             return None
 
         sign = self.w3.eth.account.sign_transaction(tx_params, self.private_key)
-        return self.w3.eth.send_raw_transaction(sign.rawTransaction)
+        return self.w3.eth.send_raw_transaction(sign.raw_transaction)
 
     def verif_tx(self, tx_hash) -> bool:
         try:
@@ -205,11 +224,7 @@ class Client:
             f"{self.address} | approve | start approve {token_address} for spender {spender}"
         )
         decimals = self.get_decimals(contract_address=token_address)
-        balance = TokenAmount(
-            amount=self.balance_of(contract_address=token_address),
-            decimals=decimals,
-            wei=True,
-        )
+        balance = self.balance_of(contract_address=token_address)
         if balance.Wei <= 0:
             print(f"{self.address} | approve | zero balance")
             return False
@@ -217,11 +232,7 @@ class Client:
         if not amount or amount.Wei > balance.Wei:
             amount = balance
 
-        approved = TokenAmount(
-            amount=self.get_allowance(token_address=token_address, spender=spender),
-            decimals=decimals,
-            wei=True,
-        )
+        approved = self.get_allowance(token_address=token_address, spender=spender)
         if amount.Wei <= approved.Wei:
             print(f"{self.address} | approve | already approved")
             return True
